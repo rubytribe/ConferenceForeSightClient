@@ -1,0 +1,4 @@
+ConferenceForeSightClient
+=========================
+
+Conference ForeSight Client
