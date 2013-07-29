@@ -4,13 +4,17 @@ define([
     'services/datacontext.storage',
     'config',
     'services/logger',
-    'services/breeze.jsonResultsAdapter'],
+    'services/breeze.jsonResultsAdapter',
+    'services/breeze.ajaxrestinterceptor'],
     function (system, model, DataContextStorage, config, logger, jsonResultAdapter) {
         var EntityQuery = breeze.EntityQuery;
         var manager = configureBreezeManager();
         var orderBy = model.orderBy;
         var entityNames = model.entityNames;
         var storage = new DataContextStorage(manager);
+        var ajaxInterceptor = new breeze.AjaxRestInterceptor();
+
+        ajaxInterceptor.enable();
 
         var getSpeakerPartials = function (speakersObservable, forceRemote) {
             if (!forceRemote) {
@@ -240,7 +244,22 @@ define([
         }
 
         function configureBreezeManager() {
-            breeze.NamingConvention.camelCase.setAsDefault();
+            var rubyNamingConvention = new breeze.NamingConvention({
+                name: "rubyNamingConvention",
+                serverPropertyNameToClient: function (serverPropertyName) {
+                    var serverPropertyNameArray = serverPropertyName.split('_')
+                    clientPropertyName = serverPropertyNameArray.shift();
+                    $.each(serverPropertyNameArray, function(i, v) { clientPropertyName += v.charAt(0).toUpperCase() + v.slice(1) });
+                    return clientPropertyName;
+                },
+                clientPropertyNameToServer: function (clientPropertyName) {
+                    var serverPropertyName = clientPropertyName.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+                    return serverPropertyName;
+                }
+            });
+
+
+            rubyNamingConvention.setAsDefault();
             var mgr = new breeze.EntityManager(config.remoteServiceName);
             model.configureMetadataStore(mgr.metadataStore);
             jsonResultAdapter.initialize(mgr);
