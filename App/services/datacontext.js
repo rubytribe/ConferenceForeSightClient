@@ -5,7 +5,8 @@ define([
     'config',
     'services/logger',
     'services/breeze.jsonResultsAdapter',
-    'services/breeze.ajaxrestinterceptor'],
+    'services/breeze.ajaxrestinterceptor',
+    'services/breeze.ccjsActiveRecordDataServiceAdapter'],
     function (system, model, DataContextStorage, config, logger, jsonResultAdapter) {
         var EntityQuery = breeze.EntityQuery;
         var manager = configureBreezeManager();
@@ -13,6 +14,7 @@ define([
         var entityNames = model.entityNames;
         var storage = new DataContextStorage(manager);
         var ajaxInterceptor = new breeze.AjaxRestInterceptor();
+        breeze.config.initializeAdapterInstance("dataService", "ccjs_active_record", true);
 
         ajaxInterceptor.enable();
 
