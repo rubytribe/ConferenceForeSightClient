@@ -34,6 +34,8 @@
 }(function(breeze) {
     'use strict'
 
+    var ajaxImpl;
+
     var ctor = function() {
         this.name = 'ccjs_active_record';
         this.configuration = {};
@@ -43,14 +45,25 @@
 
     ctor.prototype = new breeze.AbstractDataServiceAdapter();
 
+    ctor.prototype.initialize = (function(){
+        var super_initialize = ctor.prototype.initialize;
+        return function()  {
+            super_initialize();
+            ajaxImpl = breeze.config.getAdapterInstance("ajax");
+            if (ajaxImpl && ajaxImpl.ajax ) {
+                return ajaxImpl;
+            }
+            throw new Error("Unable to acquire an 'ajax' adapter for "+ this.name);
+        };
+    })();
+
     ctor.prototype.saveChanges = function(saveContext, saveBundle) {
 
-        var ajaxImpl, requestInfo;
+        var requestInfo;
         var deferred = Q.defer();
         var that = this;
 
         try{
-            ajaxImpl = this._getAjax();
             requestInfo = this._getRequestInfo(saveContext, saveBundle);
         } catch (err) {
             deferred.reject(err);
@@ -75,8 +88,12 @@
         return deferred.promise;
 
         function saveSuccess(data, textStatus, XHR) {
-            var saveResult = that._prepareSaveResult(saveContext, data, XHR);
-            deferred.resolve(saveResult);
+            try {
+                var saveResult = that._prepareSaveResult(saveContext, data, XHR);
+                deferred.resolve(saveResult);
+            } catch (err){
+                deferred.reject(err);
+            }
         }
 
         function saveFail(XHR, textStatus, errorThrown) {
@@ -84,47 +101,50 @@
         }
     };
 
-    ctor.prototype._getAjax = function() {
-        var ajaxImpl = breeze.config.getAdapterInstance("ajax");
-        if (ajaxImpl && ajaxImpl.ajax ) {
-            return ajaxImpl;
-        }
-        throw new Error("Unable to acquire an 'ajax' adapter for "+ this.name);
-    }
+
 
     ctor.prototype._getRequestInfo = function(saveContext, saveBundle){
 
         var em = saveContext.entityManager;
         var helper = em.helper;
         var metadataStore = em.metadataStore;
+        var entityInfos = [];
+        saveContext.entityInfos = entityInfos;
 
+        // TODO: handle multiple entities in single saveChanges() request
         if (saveBundle.entities.length > 1) {
             throw new Error("Can only save one entity at a time; multi-entity save is not yet implemented.")
         }
 
         var entity = saveBundle.entities[0]
         var aspect = entity.entityAspect;
-        var entityTypeShortName =  entity.entityType.shortName
-        var url = saveContext.dataService.makeUrl(this.pluralize(entityTypeShortName));
         var key =  aspect.getKey();
-        saveContext.saveKey = key;
         var id =  key.values.join(',');
-        var data = {};
-        var dataKey = entityTypeShortName.toLowerCase();
-        var entityStateName =  aspect.entityState.name;
+        var entityTypeShortName =  entity.entityType.shortName;
+        var serverTypeName = entityTypeShortName.toLowerCase();
 
+        var entityInfo = {
+            entityState: aspect.entityState,
+            key: key,
+            serverTypeName: serverTypeName
+        };
+        entityInfos.push(entityInfo);
+
+        var url = saveContext.dataService.makeUrl(this.pluralize(entityTypeShortName));
+        var data = {};
+        var entityStateName =  aspect.entityState.name;
         switch (entityStateName){
             case 'Added':
                 var raw =  helper.unwrapInstance(entity, true, true);
                 delete raw.id; // hack until we augment unwrapInstance in Breeze
-                data[dataKey] = raw;
+                data[serverTypeName] = raw;
                 return {
                     method: 'POST',
                     url: url,
                     data: JSON.stringify(data)
                 }
             case 'Modified':
-                data[dataKey] = helper.unwrapChangedValues(entity, metadataStore, true);
+                data[serverTypeName] = helper.unwrapChangedValues(entity, metadataStore, true);
                 return {
                     method: 'PUT',
                     url: url+'/'+id,
@@ -150,20 +170,32 @@
 
         // Only saving one entity so facts about it are readily available
         // and exactly parallel the data returned by server (if any)
-        var saveKey = saveContext.saveKey;
-        var entityType = saveKey.entityType;
+        var entityInfo = saveContext.entityInfos[0];
+        var saveKey = entityInfo.key;
 
-        if (data){ // was an add
-            var rawEntity = data[entityType.shortName.toLowerCase()]; // should be the saved entity
-            if (!rawEntity.$type) {rawEntity.$type = entityType.name}
-            entities.push(rawEntity);
-            var realKey = helper.getEntityKeyFromRawEntity(rawEntity, entityType, false);
-            var keyMapping = { entityTypeName: entityType.name, tempValue: saveKey.values[0], realValue: realKey.values[0] };
-            keyMappings.push(keyMapping);
-        } else { // was modify or delete
+        if (entityInfo.entityState.isDeleted() || !data) {
+            // deleted or no payload
             var entity = em.getEntityByKey(saveKey);
             if (entity) {  // should still be in cache but you never know.
                 entities.push(entity);
+            }
+        }  else if (data) {  // added or modified
+            var rawEntity = data[entityInfo.serverTypeName];
+            if (!rawEntity)  {
+                throw new error(
+                    'Could not extract saved entity data for ' +entityInfo.serverTypeName);
+            }
+            var entityType = saveKey.entityType;
+            if (!rawEntity.$type) {rawEntity.$type = entityType.name}
+            entities.push(rawEntity);
+
+            var realKey = helper.getEntityKeyFromRawEntity(rawEntity, entityType, false);
+            if (realKey.values[0] != saveKey.values[0]){ // the id changed ... as it does for an add
+                var keyMapping = {
+                    entityTypeName: entityType.name,
+                    tempValue: saveKey.values[0],
+                    realValue: realKey.values[0]};
+                keyMappings.push(keyMapping);
             }
         }
 
