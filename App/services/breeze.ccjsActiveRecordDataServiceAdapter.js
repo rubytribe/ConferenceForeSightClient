@@ -54,6 +54,7 @@
             requestInfo = this._getRequestInfo(saveContext, saveBundle);
         } catch (err) {
             deferred.reject(err);
+            return deferred.promise;
         }
 
         // Right now can only make a single save request
@@ -63,6 +64,8 @@
             url: requestInfo.url,
             data: requestInfo.data,
             dataType: 'json',
+            accept:  {json:'application/json'},
+            contentType: 'application/json; charset=utf-8',
             success: saveSuccess,
             error: saveFail
         }
@@ -101,30 +104,33 @@
 
         var entity = saveBundle.entities[0]
         var aspect = entity.entityAspect;
-        var dataKey = entity.entityType.shortName.toLowerCase();
-        var url = saveContext.dataService.makeUrl(this.pluralize(entity.entityType.shortName));
+        var entityTypeShortName =  entity.entityType.shortName
+        var url = saveContext.dataService.makeUrl(this.pluralize(entityTypeShortName));
         var key =  aspect.getKey();
         saveContext.saveKey = key;
         var id =  key.values.join(',');
+        var data = {};
+        var dataKey = entityTypeShortName.toLowerCase();
         var entityStateName =  aspect.entityState.name;
 
         switch (entityStateName){
             case 'Added':
-                var data = {};
-                data[dataKey] =  helper.unwrapInstance(entity, true);
+                var raw =  helper.unwrapInstance(entity, true, true);
+                delete raw.id; // hack until we augment unwrapInstance in Breeze
+                data[dataKey] = raw;
                 return {
                     method: 'POST',
                     url: url,
-                    data: data
+                    data: JSON.stringify(data)
                 }
             case 'Modified':
-                var data = {};
                 data[dataKey] = helper.unwrapChangedValues(entity, metadataStore, true);
                 return {
                     method: 'PUT',
                     url: url+'/'+id,
-                    data: data
+                    data: JSON.stringify(data)
                 }
+
             case 'Deleted':
                 return {
                     method: 'DELETE',
@@ -148,7 +154,7 @@
         var entityType = saveKey.entityType;
 
         if (data){ // was an add
-            var rawEntity = data; // should be the saved entity
+            var rawEntity = data[entityType.shortName.toLowerCase()]; // should be the saved entity
             if (!rawEntity.$type) {rawEntity.$type = entityType.name}
             entities.push(rawEntity);
             var realKey = helper.getEntityKeyFromRawEntity(rawEntity, entityType, false);
@@ -182,4 +188,5 @@
         var plurals = this.configuration.plurals;   // special-case pluralization
         return (plurals && plurals[name]) || name + "s";
     };
+
 }));
