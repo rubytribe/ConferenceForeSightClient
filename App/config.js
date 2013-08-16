@@ -7,8 +7,7 @@
         unknownPersonImageSource: 'unknown_person.jpg'
     };
     
-    var remoteServiceName = 'breeze/Breeze'; // EF Controller
-    //var remoteServiceName = 'breeze/BreezeNH'; // NH Controller
+    var remoteServiceName = 'http://localhost:3000/breeze';
     
     var storage = {
         enabled: true, //TODO: toggle this to use Local Storage
