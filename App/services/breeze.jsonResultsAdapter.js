@@ -21,10 +21,15 @@ define(
             var baseVisitNode = sourceAdapter.visitNode;
 
             var visitNode = function (node, mappingContext, nodeContext) {
-                if (/session|speaker/i.test(node.$type)) { // typename contains 'session' or 'speaker'
-                    // this is a full session or speaker
-                    node.isPartial = false; // camelCase, as unmapped property is defined on client
-                }
+                // Original for .NET server where projected typename is unpronouncable
+                // if (/session|speaker/i.test(node.$type)) { // typename contains 'session' or 'speaker'
+                // this is a full session or speaker
+                //    node.isPartial = false; // camelCase, as unmapped property is defined on client
+                // }
+
+                // Rails version where we control the projected type name.
+                // if type name contains 'partial' ..
+                node.isPartial =  /partial/i.test(node.$type) 
                 return baseVisitNode(node, mappingContext, nodeContext);
             };
             
