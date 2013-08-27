@@ -44,7 +44,7 @@
 
     return {
         version: '1.1.0',
-        appSubtitle: "[Jumpstart - Hot Towel]",
+        appSubtitle: "[Ruby Jumpstart - Hot Towel]",
         debugEnabled: ko.observable(true),
         imageSettings: imageSettings,
         remoteServiceName: remoteServiceName,

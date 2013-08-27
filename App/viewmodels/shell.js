@@ -29,7 +29,7 @@
 
         function boot() {
             router.map(config.routes);
-            log('CodeCamper Jumpstart loaded!', null, true);
+            log('Ruby CodeCamper Jumpstart loaded!', null, true);
             return router.activate(config.startModule);
         }
         

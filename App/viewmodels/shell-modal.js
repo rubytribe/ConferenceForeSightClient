@@ -33,7 +33,7 @@
         function boot() {
             router.map(config.routes);
             toastr.options.timeOut = config.toastrOptions.timeOut;
-            toastr.info('CodeCamper Jumpstart successfully loaded!');
+            toastr.info('Ruby CodeCamper Jumpstart successfully loaded!');
             return router.activate(config.startModule);
         }
 
