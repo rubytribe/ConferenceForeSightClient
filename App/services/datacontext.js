@@ -15,6 +15,7 @@ define([
         var storage = new DataContextStorage(manager);
         var ajaxInterceptor = new breeze.AjaxRestInterceptor();
         breeze.config.initializeAdapterInstance("dataService", "ccjs_active_record", true);
+        breeze.saveErrorMessageService.getEntityName = function(){}; // don't show entity name in error message
 
         ajaxInterceptor.enable();
 
@@ -138,11 +139,11 @@ define([
             }
 
             function saveFailed(error) {
-                var msg = 'Save failed: ' + getErrorMessages(error);
-                logError(msg, error);
+                var msg = 'Save failed: ' + breeze.saveErrorMessageService.getErrorMessage(error);
                 error.message = msg;
+                logError(msg, error);
                 throw error;
-            }
+           }
         };
 
         var primeData = function () {
